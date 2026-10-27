@@ -7,3 +7,5 @@
 .vscode/
 *.log
 /.toolchains/
+/docs/
+AGENTS.md
