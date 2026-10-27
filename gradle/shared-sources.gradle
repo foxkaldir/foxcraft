@@ -1,0 +1,5 @@
+// Compile the same source on each loader so Fabric can remap Mojang names.
+// No cross-loader runtime library or common JAR is required by players.
+def shared = project(':common')
+sourceSets.main.java.srcDir(shared.file('src/main/java'))
+sourceSets.main.resources.srcDir(shared.tasks.named('assembleContentResources'))

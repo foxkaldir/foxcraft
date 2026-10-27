@@ -1,0 +1,76 @@
+plugins { id 'net.neoforged.moddev' }
+
+// Compile shared code against unmodified Minecraft, never a loader API.
+neoForge {
+    enable {
+        neoFormVersion = rootProject.neoform_version
+        disableRecompilation = true
+    }
+}
+
+// Author resources by feature; only the assembled output uses Minecraft paths.
+def assembleContentResources = tasks.register('assembleContentResources', Sync) {
+    group = 'build'
+    description = 'Assemble feature resources into the Minecraft 1.21.1 pack layout.'
+    into layout.buildDirectory.dir('generated/contentResources')
+    includeEmptyDirs = false
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+
+    def namespace = rootProject.mod_id
+    def blockFiles = [
+        'blockstate.json': "assets/${namespace}/blockstates/%s.json",
+        'block_model.json': "assets/${namespace}/models/block/%s.json",
+        'item_model.json': "assets/${namespace}/models/item/%s.json",
+        'texture.png': "assets/${namespace}/textures/block/%s.png",
+        'loot.json': "data/${namespace}/loot_table/blocks/%s.json"
+    ]
+    inputs.property('namespace', namespace)
+    from('content') {
+        eachFile { resource ->
+            def parts = resource.path.split('/', 2)
+            def feature = parts[0]
+            def name = parts.length > 1 ? parts[1] : ''
+            if (feature == 'shared' && name == 'pack.mcmeta') {
+                resource.path = 'pack.mcmeta'
+            } else if (feature == 'shared' && name.startsWith('lang/')) {
+                resource.path = "assets/${namespace}/${name}"
+            } else if (feature == 'shared' && name.startsWith('tags/')) {
+                def tag = name.split('/', 3)
+                if (tag.length != 3) {
+                    throw new GradleException("Expected shared/tags/<namespace>/<type>/<path>: ${resource.path}")
+                }
+                resource.path = "data/${tag[1]}/tags/${tag[2]}"
+            } else if (feature != 'shared' && blockFiles.containsKey(name)) {
+                resource.path = String.format(blockFiles[name], feature)
+            } else if (feature != 'shared' && name.startsWith('recipes/')) {
+                resource.path = "data/${namespace}/recipe/${name.substring('recipes/'.length())}"
+            } else if (feature != 'shared' && name.startsWith('advancements/')) {
+                resource.path = "data/${namespace}/advancement/recipes/${name.substring('advancements/'.length())}"
+            } else {
+                throw new GradleException("Unknown content resource: ${resource.path}")
+            }
+        }
+    }
+}
+
+sourceSets.main.resources.setSrcDirs([assembleContentResources])
+
+// The catalog is plain Java, so generating the fixed NeoForge fuel map does
+// not need to start Minecraft or depend on a loader's datagen API.
+sourceSets {
+    datagen {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+tasks.register('generateNeoForgeFuelData', JavaExec) {
+    group = 'build'
+    description = 'Generate the NeoForge fuel data map from the shared content catalog.'
+    dependsOn tasks.named('datagenClasses')
+    classpath = sourceSets.datagen.runtimeClasspath
+    mainClass = 'dev.foxcraft.data.NeoForgeFuelData'
+    def generatedDirectory = layout.buildDirectory.dir('generated/neoforgeResources')
+    args generatedDirectory.get().asFile.absolutePath
+    outputs.dir generatedDirectory
+}

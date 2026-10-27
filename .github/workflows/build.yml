@@ -1,0 +1,28 @@
+name: Build
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version pins
+        id: versions
+        run: |
+          echo "java=$(sed -n 's/^java_version=//p' gradle.properties)" >> "$GITHUB_OUTPUT"
+          echo "minecraft=$(sed -n 's/^minecraft_version=//p' gradle.properties)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.versions.outputs.java }}
+          cache: gradle
+      - name: Build both loaders
+        run: bash gradlew build bundleMods --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: foxcraft-${{ steps.versions.outputs.minecraft }}
+          path: output/*.jar

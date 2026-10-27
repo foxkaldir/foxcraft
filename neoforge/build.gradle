@@ -1,0 +1,27 @@
+plugins { id 'net.neoforged.moddev' }
+apply from: rootProject.file('gradle/shared-sources.gradle')
+
+sourceSets.main.resources.srcDir(project(':common').tasks.named('generateNeoForgeFuelData'))
+
+neoForge {
+    enable {
+        version = rootProject.neoforge_version
+        disableRecompilation = true
+    }
+    mods {
+        foxcraft { sourceSet sourceSets.main }
+    }
+    runs {
+        client {
+            client()
+            gameDirectory = file('runs/client')
+            loadedMods = [mods.foxcraft]
+        }
+        server {
+            server()
+            gameDirectory = file('runs/server')
+            programArgument 'nogui'
+            loadedMods = [mods.foxcraft]
+        }
+    }
+}

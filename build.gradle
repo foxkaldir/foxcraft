@@ -1,0 +1,65 @@
+plugins {
+    id 'base'
+    id 'fabric-loom' apply false
+    id 'net.neoforged.moddev' apply false
+}
+
+subprojects {
+    apply plugin: 'java-library'
+
+    group = rootProject.mod_group
+    version = rootProject.mod_version
+    base.archivesName = "${rootProject.mod_id}-${project.name}-${rootProject.minecraft_version}"
+
+    java {
+        toolchain.languageVersion = JavaLanguageVersion.of(rootProject.java_version)
+        withSourcesJar()
+    }
+
+    repositories {
+        mavenCentral()
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+        options.release = rootProject.java_version.toInteger()
+        options.compilerArgs.add('-Xlint:deprecation')
+    }
+
+    tasks.withType(AbstractArchiveTask).configureEach {
+        preserveFileTimestamps = false
+        reproducibleFileOrder = true
+    }
+
+    tasks.withType(ProcessResources).configureEach {
+        def metadata = [
+            mod_id: rootProject.mod_id,
+            mod_name: rootProject.mod_name,
+            mod_version: rootProject.mod_version,
+            mod_description: rootProject.mod_description,
+            minecraft_version: rootProject.minecraft_version,
+            java_version: rootProject.java_version,
+            fabric_loader_version: rootProject.fabric_loader_version,
+            neoforge_version_range: rootProject.neoforge_version_range
+        ]
+        inputs.properties(metadata)
+        filesMatching(['fabric.mod.json', 'META-INF/neoforge.mods.toml']) {
+            expand(metadata)
+        }
+    }
+}
+
+// These are the two installable JARs; the common module is never installed alone.
+tasks.register('bundleMods', Sync) {
+    group = 'build'
+    description = 'Build both loaders and copy their release JARs into output/.'
+    dependsOn ':common:build', ':fabric:build', ':neoforge:build'
+    from(project(':fabric').tasks.named('remapJar'))
+    from(project(':neoforge').tasks.named('jar'))
+    into layout.projectDirectory.dir('output')
+}
+
+tasks.named('build') { dependsOn subprojects.collect { it.tasks.named('build') } }
+tasks.named('check') { dependsOn subprojects.collect { it.tasks.named('check') } }

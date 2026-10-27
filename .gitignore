@@ -1,3 +1,9 @@
 /output/
-/docs/
-bundle.sh
+.gradle/
+**/build/
+**/runs/
+.idea/
+*.iml
+.vscode/
+*.log
+/.toolchains/
